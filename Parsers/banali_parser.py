@@ -4,8 +4,8 @@ This file is used for https://banali.am/ data collection.
 from typing import Union, List
 import requests
 
-class BanaliParser:
-    regions_by_id: dict[str, int] = {
+class Regions:
+    _regions_by_id: dict[str, int] = {
         "yerevan": 1,
         "gexarquniq": 2,
         "shirak": 3,
@@ -19,6 +19,7 @@ class BanaliParser:
         "ararat": 11
     }
 
+class BanaliLinkCreater(Regions):
     def __init__(self, trade_type, regions):
         self.__trade_type = trade_type
         self.__regions = regions
@@ -35,19 +36,77 @@ class BanaliParser:
         # Making URL for each region separately
         if self.__regions == "all":
             return base_url + "/" + url_trade_type
-        elif isinstance(self.__regions,list) and all(region.lower() in self.regions_by_id for region in self.__regions):
-            url_regions = "&".join(f"state={str(self.regions_by_id[region.lower()])}" for region in self.__regions)
+        elif isinstance(self.__regions, list) and all(
+                region.lower() in self._regions_by_id for region in self.__regions):
+            url_regions = "&".join(f"state={str(self._regions_by_id[region.lower()])}" for region in self.__regions)
             return base_url + "/" + url_trade_type + "?" + url_regions
         else:
             raise ValueError(f"Invalid regions: {self.__regions}. Must be 'all' or a list of valid regions.")
 
-    def _get_page_url(self, page):
+    def get_page_url(self, page):
         # Adding page to url of https://banali.am/vachark format
         if "?" in self.__base_url:
             return self.__base_url + f"&page={page}"
         else:
             return self.__base_url + f"?page={page}"
 
+
+class GetCardsURL(Regions):
+    __json_data = {
+        'params': {
+            'filters': {
+                'public_code': '',
+                'renovation': [],
+                'structure_type': '',
+                'developer_name': '',
+                'rooms': [],
+                'rental_price_type': [],
+                'property_type': [],
+                'is_developer': [],
+                'sqm_price': [],
+                'price': [],
+                'monthly_mortgage': [],
+                'area': [],
+                'heating': [],
+                'furniture': [],
+                'amenities': [],
+                'bedrooms': [],
+                'floor': [],
+                'has_3D_tour': [],
+                'building_name': '',
+                'animals': [],
+                'with_installment': [],
+                'is_favorite': [],
+                'deal': 'sell',
+                'state_id': [],
+                'district_id': [],
+            },
+            'sortBy': 'date_desc',
+        },
+    }
+    __params = {'page': '1'}
+
+    def __init__(self, regions):
+        self.__regions = regions
+
+    def __get_response(self, page):
+        if self.__regions == 'all':
+            self.__json_data['params']['filters']['state_id'] = []
+        else:
+            states = []
+            for region in self.__regions:
+                if region.lower() in self._regions_by_id.keys():
+                    states.append(str(self._regions_by_id[region.lower()]))
+                    self.__json_data['params']['filters']['state_id'] = states
+
+        self.__params['page'] = str(page)
+        response = requests.post('https://banali.am/api/search/filter-posts', params=self.__params,
+                                 json=self.__json_data)
+        return response
+
+
+
 if __name__ == '__main__':
-    parser = BanaliParser("buy/sell", "all")
-    print(parser._get_page_url(2))
+    link_creator = BanaliLinkCreater("buy/sell", ['yerevan','kotayk'])
+    urls = GetCardsURL(['yerevan','kotayk'])
+    urls.get_response(1)
